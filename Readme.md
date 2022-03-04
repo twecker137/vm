@@ -23,7 +23,7 @@ module "test_linux_vm001" {
     nic_number = 1
     subnet_id  = ""
   }]
-  admin_username = "akmeadmin"
+  admin_username = "admin"
   admin_ssh_key = [{
     username   = ""
     public_key = "ssh-rsa "
