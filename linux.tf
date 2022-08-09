@@ -23,6 +23,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
   proximity_placement_group_id = var.proximity_placement_group_id
   availability_set_id          = var.availability_set_id
   zone                         = var.zone
+  license_type                 = var.vm_os_license
 
   os_disk {
     name                      = "osdisk-${var.name}"
@@ -38,6 +39,14 @@ resource "azurerm_linux_virtual_machine" "vm" {
       name      = plan.value["name"]
       product   = plan.value["product"]
       publisher = plan.value["publisher"]
+    }
+  }
+
+  dynamic "identity" {
+    for_each = local.identity
+    content {
+      type         = identity.value["type"]
+      identity_ids = identity.value["identity_ids"]
     }
   }
 

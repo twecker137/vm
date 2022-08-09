@@ -114,12 +114,7 @@ variable "name" {
 }
 
 variable "nic_config" {
-  type = list(object(
-    {
-      nic_number = number
-      subnet_id  = string
-    }
-  ))
+  type = list(map(any))
 }
 
 variable "public_ip_config" {
@@ -236,9 +231,10 @@ variable "vm_os_version" {
 }
 
 variable "vm_os_license" {
-  description = "Defaults to Standard, Possible values are None, Windows_Client and Windows_Server. Changing this forces a new resource to be created."
+  description = "Defaults to Standard, Possible values are None, Windows_Client, Windows_Server, RHEL_BYOS and SLES_BYOS."
   default     = null
 }
+
 variable "write_accelerator_enabled" {
   type        = bool
   default     = false
