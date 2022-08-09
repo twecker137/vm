@@ -4,7 +4,7 @@
 
 ```hcl
 module "test_linux_vm001" {
-  source                             = "es-tf-modules/vm"
+  source                             = "modules/vm"
   name                               = "vmhubtest001"
   location                           = ""
   resource_group_name                = ""

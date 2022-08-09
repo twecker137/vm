@@ -1,3 +1,11 @@
+terraform {
+  required_providers {
+    azurerm = {
+      version = ">= 2.86.0"
+    }
+  }
+}
+
 module "os" {
   #this module is part of the original compute module from the terraform registry and wasn't changed
   source       = "./os"
@@ -5,12 +13,17 @@ module "os" {
 }
 
 locals {
-  nic_config = flatten([
+  nic_config = { for nic_config in flatten([
     for nic in var.nic_config : {
-      nic_number = nic.nic_number
-      subnet_id  = nic.subnet_id
+      nic_number                    = nic.nic_number
+      subnet_id                     = nic.subnet_id
+      private_ip_address            = try(nic.private_ip_address, false)
+      network_security_group_id     = try(nic.network_security_group_id, false)
+      assign_network_security_group = try(nic.assign_network_security_group, false)
     }
-  ])
+  ]) : nic_config.nic_number => nic_config }
+
+
   disk_config = flatten([
     for disk in var.disk_config : {
       disk_number               = disk.disk_number
@@ -73,9 +86,7 @@ resource "azurerm_public_ip" "pip" {
 }
 
 resource "azurerm_network_interface" "nic" {
-  for_each = {
-    for nic_config in local.nic_config : nic_config.nic_number => nic_config
-  }
+  for_each            = local.nic_config
   name                = "nic-${var.name}-${format("%03d", each.value.nic_number)}"
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -84,10 +95,17 @@ resource "azurerm_network_interface" "nic" {
   ip_configuration {
     name                          = "nic${format("%03d", each.value.nic_number)}-ipconfig"
     subnet_id                     = each.value.subnet_id
-    private_ip_address_allocation = "Dynamic"
+    private_ip_address_allocation = (each.value.private_ip_address != false) ? "Static" : "Dynamic"
+    private_ip_address            = (each.value.private_ip_address != false) ? each.value.private_ip_address : null
     public_ip_address_id          = contains(var.public_ip_config, each.value.nic_number) ? azurerm_public_ip.pip[each.value.nic_number].id : null
   }
   tags = var.tags
+}
+
+resource "azurerm_network_interface_security_group_association" "nic" {
+  for_each                  = { for k, v in local.nic_config : k => v if try(v.assign_network_security_group, false) }
+  network_interface_id      = azurerm_network_interface.nic[each.key].id
+  network_security_group_id = each.value.network_security_group_id
 }
 
 resource "azurerm_managed_disk" "disk" {
@@ -98,11 +116,12 @@ resource "azurerm_managed_disk" "disk" {
   location               = var.location
   resource_group_name    = var.resource_group_name
   storage_account_type   = each.value.disk_storage_account_type
-  zones                  = var.zone == null ? null : [var.zone]
+  zone                   = var.zone
   create_option          = "Empty"
   disk_size_gb           = each.value.disk_size_gb
   tags                   = var.tags
   disk_encryption_set_id = var.enable_disk_encryption_set == true ? azurerm_disk_encryption_set.des[0].id : null
+
   lifecycle {
     ignore_changes = [
       create_option,
@@ -145,9 +164,14 @@ resource "azurerm_disk_encryption_set" "des" {
   resource_group_name = var.resource_group_name
   location            = var.location
   key_vault_key_id    = azurerm_key_vault_key.des-key[0].id
+  tags                = var.tags
 
   identity {
     type = "SystemAssigned"
+  }
+
+  lifecycle {
+    ignore_changes = [encryption_type]
   }
 }
 
@@ -158,12 +182,12 @@ resource "azurerm_key_vault_access_policy" "kvap-disk" {
   object_id    = azurerm_disk_encryption_set.des[0].identity.0.principal_id
 
   key_permissions = [
-    "get",
-    "decrypt",
-    "encrypt",
-    "sign",
-    "unwrapKey",
-    "verify",
-    "wrapKey",
+    "Get",
+    "Decrypt",
+    "Encrypt",
+    "Sign",
+    "UnwrapKey",
+    "Verify",
+    "WrapKey",
   ]
 }
