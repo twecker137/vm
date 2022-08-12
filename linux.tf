@@ -6,6 +6,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
   size                = var.size
   admin_username      = var.admin_username
   admin_password      = var.disable_password_authentication == false ? random_password.admin_password.result : null
+  custom_data         = var.custom_data == null ? null : base64encode(var.custom_data)
 
   disable_password_authentication = var.disable_password_authentication
 

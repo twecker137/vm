@@ -13,6 +13,11 @@ variable "admin_username" {
   type    = string
 }
 
+variable "custom_data" {
+  type    = string
+  default = null
+}
+
 variable "availability_set_id" {
   default = null
   type    = string
